@@ -102,13 +102,13 @@ class RandomCrop_city(object):  # used for results in the CVPR-19 submission
         #img = img.resize((512, 256), Image.BILINEAR)
         #mask = mask.resize((512, 256), Image.NEAREST)
 
-        x1 = random.randint(0, int(w/2) - tw)
-        y1 = random.randint(0, int(h/2) - th)
-
+        x1 = random.randrange(0, 512)
+        y1 = 0
         return (
-            img.crop((x1, y1, x1 + tw, y1 + th)),
-            mask.crop((x1, y1, x1 + tw, y1 + th)),
-            depth.crop((x1, y1, x1 + tw, y1 + th))
+            img.crop((x1, y1, x1 + 512, y1 + 512)),
+            mask.crop((x1, y1, x1 + 512, y1 + 512)),
+            depth.crop((x1, y1, x1 + 512, y1 + 512)),
+            # x1
         )
 
 class RandomCrop_gta(object):  # used for results in the CVPR-19 submission

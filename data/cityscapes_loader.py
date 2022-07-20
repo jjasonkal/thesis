@@ -4,7 +4,6 @@ import cv2
 import numpy as np
 import scipy.io as io
 import utils.scipymisc as m
-
 from torch.utils import data
 
 from data.city_utils import recursive_glob
@@ -186,17 +185,17 @@ class cityscapesLoader(data.Dataset):
             depth = 0. * np.array(lbl.copy(), dtype=np.float32)
 
         if self.augmentations is not None:
-            img, lbl, depth = self.augmentations(img, lbl, depth)
-
+            img, lbl, depth= self.augmentations(img, lbl, depth)
+        x1 = 1
         if self.is_transform:
             img, lbl, depth = self.transform(img, lbl, depth)
 
         img_name = img_path.split('/')[-1]
         if self.return_id:
             return img, lbl, img_name, img_name, index
-        
+
         if "val" not in self.split:
-            return img, lbl, img_path, lbl_path, depth
+            return img, lbl, img_path, lbl_path, depth, x1
         else:
             return img, lbl, img_path, lbl_path, img_name
 
@@ -261,6 +260,85 @@ class cityscapesLoader(data.Dataset):
         for _validc in self.valid_classes:
             mask[mask == _validc] = self.class_map[_validc]
         return mask
+
+    def getitem(index):
+        """__getitem__
+        :param index:
+        """
+        root = '/mnt/genesis/kaltsikis/data/CityScapes'
+        img_path = root+"/leftImg8bit_trainvaltest/leftImg8bit/train/"+index
+        lbl_path = os.path.join(
+            os.path.join(
+                root, "gtFine_trainvaltest/", "gtFine", "train"
+            ),
+            img_path.split(os.sep)[-2],  # temporary for cross validation
+            os.path.basename(img_path)[:-15] + "gtFine_labelIds.png",
+        )
+
+        img = m.imread(img_path)
+        img = np.array(img, dtype=np.uint8)
+
+        lbl = m.imread(lbl_path)
+        lbl = np.array(lbl, dtype=np.uint8)
+        # lbl = encode_segmap(lbl)
+
+        # Placeholder waiting for data
+
+        ## Stereo Depth
+        depth_path = os.path.join(
+            os.path.join(root, "depth", "train"),
+            img_path.split(os.sep)[-2],
+            os.path.basename(img_path)[:-15] + "depth_stereoscopic.mat",
+        )
+
+
+        depth = io.loadmat(depth_path)["depth_map"]
+        depth = np.clip(depth, 0., 655.35)
+        depth[depth < 0.1] = 655.35
+        depth = 655.36 / (depth + 0.01)
+        print(img.shape)
+        img = m.imresize(img, (512,1024))  # uint8 with RGB mode
+        lbl = lbl.astype(float)
+        lbl = m.imresize(lbl, (512,1024), "nearest", mode="F")
+        lbl = lbl.astype(int)
+        depth = m.imresize(depth, (512,1024), "nearest", mode="F")
+        depth = depth.astype(float)
+        from random import randrange
+        crop = randrange(512)
+        img = img[:, 0+crop:512+crop, :]
+        lbl = lbl[:, 0+crop:512+crop]
+        depth = depth[:, 0+crop:512+crop]
+
+        # data_aug = Compose([RandomCrop_city((512, 512))])
+        # img, lbl, depth = data_aug(img, lbl, depth)
+
+        img = img[:, :, ::-1]  # RGB -> BGR
+        img = img.astype(np.float64)
+        from configs.global_vars import IMG_MEAN
+        img -= IMG_MEAN
+        # img -= self.mean
+        # if self.img_norm:
+        #     # Resize scales images from 0 to 255, thus we need
+        #     # to divide by 255.0
+        #     img = img.astype(float) / 255.0
+        # NHWC -> NCHW
+        img = img.transpose(2, 0, 1)
+
+        classes = np.unique(lbl)
+
+        #
+        # if not np.all(classes == np.unique(lbl)):
+        #     print("WARN: resizing labels yielded fewer classes")
+
+        # if not np.all(np.unique(lbl[lbl != self.ignore_index]) < self.n_classes):
+        #     print("after det", classes, np.unique(lbl))
+        #     raise ValueError("Segmentation map contained invalid class values")
+
+        # img = torch.from_numpy(img).float()
+        # lbl = torch.from_numpy(lbl).long()
+        # depth = torch.from_numpy(depth).float()
+        img_name = img_path.split('/')[-1]
+        return img, lbl, img_name, depth
 
 '''
 if __name__ == "__main__":
